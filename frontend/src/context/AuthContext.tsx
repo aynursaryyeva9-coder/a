@@ -13,19 +13,24 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  hasAcceptedPrivacy: boolean;
   login: (phone: string, password: string) => Promise<void>;
   register: (phone: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   sendVerificationCode: (phone: string) => Promise<string>;
   verifyCode: (phone: string, code: string) => Promise<boolean>;
+  acceptPrivacyPolicy: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const PRIVACY_ACCEPTED_KEY = 'vitamed_privacy_accepted';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
 
   useEffect(() => {
     loadStoredAuth();
@@ -33,6 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadStoredAuth = async () => {
     try {
+      // Check privacy policy acceptance
+      const privacyAccepted = await AsyncStorage.getItem(PRIVACY_ACCEPTED_KEY);
+      setHasAcceptedPrivacy(privacyAccepted === 'true');
+
+      // Check stored token
       const storedToken = await AsyncStorage.getItem('vitamed_token');
       if (storedToken) {
         const response = await api.get(`/auth/me?token=${storedToken}`);
@@ -47,9 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const acceptPrivacyPolicy = async () => {
+    await AsyncStorage.setItem(PRIVACY_ACCEPTED_KEY, 'true');
+    setHasAcceptedPrivacy(true);
+  };
+
   const sendVerificationCode = async (phone: string): Promise<string> => {
     const response = await api.post('/auth/send-code', { phone });
-    return response.data.demo_code; // Only for demo
+    return response.data.demo_code;
   };
 
   const verifyCode = async (phone: string, code: string): Promise<boolean> => {
@@ -85,11 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         token,
         isLoading,
+        hasAcceptedPrivacy,
         login,
         register,
         logout,
         sendVerificationCode,
         verifyCode,
+        acceptPrivacyPolicy,
       }}
     >
       {children}

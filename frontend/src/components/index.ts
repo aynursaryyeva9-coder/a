@@ -6,3 +6,4 @@ export { SkeletonLoader, DocumentSkeleton } from './SkeletonLoader';
 export { InfoCard } from './InfoCard';
 export { FeatureRow } from './FeatureRow';
 export { PrimaryButton } from './PrimaryButton';
+export { PrivacyPolicyView } from './PrivacyPolicyView';
