@@ -6,10 +6,21 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  FadeInDown,
+  FadeInRight,
+  SlideInRight,
+} from 'react-native-reanimated';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/services/api';
 
@@ -20,6 +31,10 @@ interface Document {
   date: string;
   created_at: string;
 }
+
+const { width } = Dimensions.get('window');
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function HomeScreen() {
   const { user, token } = useAuth();
@@ -67,6 +82,16 @@ export default function HomeScreen() {
     return icons[type] || 'document';
   };
 
+  const getTypeColor = (type: string) => {
+    const colors: { [key: string]: string } = {
+      blood_test: '#E53935',
+      xray: '#8E24AA',
+      prescription: '#43A047',
+      other: '#1E88E5',
+    };
+    return colors[type] || '#1E88E5';
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('tr-TR', {
@@ -76,58 +101,117 @@ export default function HomeScreen() {
     });
   };
 
+  const QuickActionCard = ({ 
+    icon, 
+    title, 
+    color, 
+    bgColor, 
+    onPress, 
+    index 
+  }: { 
+    icon: keyof typeof Ionicons.glyphMap; 
+    title: string; 
+    color: string; 
+    bgColor: string; 
+    onPress: () => void;
+    index: number;
+  }) => {
+    const scale = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: scale.value }],
+    }));
+
+    return (
+      <AnimatedTouchable
+        entering={FadeInDown.delay(100 * index).springify()}
+        style={[styles.actionCard, animatedStyle]}
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.95); }}
+        onPressOut={() => { scale.value = withSpring(1); }}
+        activeOpacity={1}
+      >
+        <View style={[styles.actionIcon, { backgroundColor: bgColor }]}>
+          <Ionicons name={icon} size={28} color={color} />
+        </View>
+        <Text style={styles.actionText}>{title}</Text>
+      </AnimatedTouchable>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E88E5']} />
         }
       >
         {/* Header */}
-        <View style={styles.header}>
+        <Animated.View entering={FadeInDown.springify()} style={styles.header}>
           <View>
             <Text style={styles.greeting}>Merhaba,</Text>
             <Text style={styles.userName}>{user?.name || 'Kullanıcı'}</Text>
           </View>
-          <View style={styles.logoContainer}>
+          <Animated.View 
+            entering={FadeInRight.delay(200).springify()}
+            style={styles.logoContainer}
+          >
             <Ionicons name="medical" size={32} color="#1E88E5" />
+          </Animated.View>
+        </Animated.View>
+
+        {/* Stats Card */}
+        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.statsCard}>
+          <View style={styles.statsGradient}>
+            <View style={styles.statsContent}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{recentDocs.length}</Text>
+                <Text style={styles.statLabel}>Toplam Belge</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Ionicons name="shield-checkmark" size={28} color="#fff" />
+                <Text style={styles.statLabel}>Güvenli</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Ionicons name="cloud-done" size={28} color="#fff" />
+                <Text style={styles.statLabel}>Yedekli</Text>
+              </View>
+            </View>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
           <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={styles.actionCard}
+            <QuickActionCard
+              icon="cloud-upload"
+              title="Belge Yükle"
+              color="#1E88E5"
+              bgColor="#E3F2FD"
               onPress={() => router.push('/(tabs)/upload')}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
-                <Ionicons name="cloud-upload" size={28} color="#1E88E5" />
-              </View>
-              <Text style={styles.actionText}>Belge Yükle</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
+              index={0}
+            />
+            <QuickActionCard
+              icon="folder-open"
+              title="Belgelerim"
+              color="#43A047"
+              bgColor="#E8F5E9"
               onPress={() => router.push('/(tabs)/documents')}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
-                <Ionicons name="folder" size={28} color="#43A047" />
-              </View>
-              <Text style={styles.actionText}>Belgelerim</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
+              index={1}
+            />
+            <QuickActionCard
+              icon="chatbubble-ellipses"
+              title="Asistan"
+              color="#FB8C00"
+              bgColor="#FFF3E0"
               onPress={() => router.push('/(tabs)/assistant')}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: '#FFF3E0' }]}>
-                <Ionicons name="chatbubbles" size={28} color="#FB8C00" />
-              </View>
-              <Text style={styles.actionText}>Asistan</Text>
-            </TouchableOpacity>
+              index={2}
+            />
           </View>
         </View>
 
@@ -141,25 +225,30 @@ export default function HomeScreen() {
           </View>
 
           {recentDocs.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="document-text-outline" size={48} color="#CCC" />
-              <Text style={styles.emptyText}>Henüz belge yok</Text>
+            <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="document-text-outline" size={48} color="#90CAF9" />
+              </View>
+              <Text style={styles.emptyTitle}>Henüz belge yok</Text>
+              <Text style={styles.emptyText}>Sağlık belgelerinizi yükleyerek başlayın</Text>
               <TouchableOpacity
                 style={styles.uploadButton}
                 onPress={() => router.push('/(tabs)/upload')}
               >
+                <Ionicons name="add" size={20} color="#fff" />
                 <Text style={styles.uploadButtonText}>İlk Belgenizi Yükleyin</Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           ) : (
-            recentDocs.map((doc) => (
-              <TouchableOpacity
+            recentDocs.map((doc, index) => (
+              <AnimatedTouchable
                 key={doc.id}
+                entering={SlideInRight.delay(100 * index).springify()}
                 style={styles.docCard}
                 onPress={() => router.push(`/document/${doc.id}`)}
               >
-                <View style={styles.docIcon}>
-                  <Ionicons name={getTypeIcon(doc.type)} size={24} color="#1E88E5" />
+                <View style={[styles.docIcon, { backgroundColor: `${getTypeColor(doc.type)}15` }]}>
+                  <Ionicons name={getTypeIcon(doc.type)} size={24} color={getTypeColor(doc.type)} />
                 </View>
                 <View style={styles.docInfo}>
                   <Text style={styles.docTitle}>{doc.title}</Text>
@@ -167,23 +256,27 @@ export default function HomeScreen() {
                     {getTypeLabel(doc.type)} • {formatDate(doc.date)}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#CCC" />
-              </TouchableOpacity>
+                <View style={styles.docArrow}>
+                  <Ionicons name="chevron-forward" size={20} color="#B0BEC5" />
+                </View>
+              </AnimatedTouchable>
             ))
           )}
         </View>
 
         {/* Health Tips */}
-        <View style={styles.section}>
+        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.section}>
           <Text style={styles.sectionTitle}>Sağlık İpucu</Text>
           <View style={styles.tipCard}>
-            <Ionicons name="bulb" size={24} color="#FFC107" />
+            <View style={styles.tipIconContainer}>
+              <Ionicons name="bulb" size={24} color="#FFC107" />
+            </View>
             <Text style={styles.tipText}>
               Düzenli sağlık kontrolü yaptırmak, hastalıkların erken teşhisi için önemlidir.
               Yılda en az bir kez check-up yaptırmayı unutmayın.
             </Text>
           </View>
-        </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -192,10 +285,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: '#F5F9FF',
   },
   scrollContent: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
@@ -205,142 +299,232 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 16,
-    color: '#666',
+    color: '#78909C',
+    fontWeight: '500',
   },
   userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1A237E',
+    letterSpacing: -0.5,
   },
   logoContainer: {
     width: 56,
     height: 56,
     backgroundColor: '#E3F2FD',
-    borderRadius: 28,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statsCard: {
+    borderRadius: 20,
+    marginBottom: 28,
+    overflow: 'hidden',
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  statsGradient: {
+    backgroundColor: '#1E88E5',
+    padding: 24,
+  },
+  statsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A237E',
+    letterSpacing: -0.3,
   },
   seeAll: {
     fontSize: 14,
     color: '#1E88E5',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
   },
   actionCard: {
     flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     alignItems: 'center',
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   actionIcon: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   actionText: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#37474F',
+    fontWeight: '600',
     textAlign: 'center',
   },
   emptyState: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
+    borderRadius: 20,
+    padding: 40,
     alignItems: 'center',
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 12,
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#37474F',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#78909C',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1E88E5',
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   uploadButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    marginLeft: 8,
   },
   docCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
+    marginBottom: 12,
+    shadowColor: '#1E88E5',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 2,
   },
   docIcon: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   docInfo: {
     flex: 1,
   },
   docTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: '600',
+    color: '#263238',
     marginBottom: 4,
   },
   docMeta: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: '#78909C',
+  },
+  docArrow: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tipCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFDE7',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#FFF9C4',
+  },
+  tipIconContainer: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FFF59D',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
   tipText: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
-    marginLeft: 12,
-    lineHeight: 20,
+    color: '#5D4037',
+    lineHeight: 22,
   },
 });
