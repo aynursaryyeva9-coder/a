@@ -24,8 +24,8 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# JWT Secret
-JWT_SECRET = os.environ.get('JWT_SECRET', 'vitamed_secret_key_2025')
+# JWT Secret - Must be set in environment
+JWT_SECRET = os.environ['JWT_SECRET']
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
 # Create the main app without a prefix
