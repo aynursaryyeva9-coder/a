@@ -6,23 +6,22 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withDelay,
   FadeInDown,
   FadeInRight,
   SlideInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
 } from 'react-native-reanimated';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/services/api';
+import { InfoCard } from '../../src/components/InfoCard';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 
 interface Document {
   id: string;
@@ -31,8 +30,6 @@ interface Document {
   date: string;
   created_at: string;
 }
-
-const { width } = Dimensions.get('window');
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -101,6 +98,17 @@ export default function HomeScreen() {
     });
   };
 
+  const getLastRecordDate = () => {
+    if (recentDocs.length === 0) return 'Kayıt yok';
+    const lastDoc = recentDocs[0];
+    const date = new Date(lastDoc.date);
+    const today = new Date();
+    const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Bugün';
+    if (diffDays === 1) return 'Dün';
+    return `${diffDays} gün önce`;
+  };
+
   const QuickActionCard = ({ 
     icon, 
     title, 
@@ -148,41 +156,46 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E88E5']} />
         }
       >
-        {/* Header */}
+        {/* Header - SwiftUI Style */}
         <Animated.View entering={FadeInDown.springify()} style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Merhaba,</Text>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.greeting}>Hoş geldin</Text>
             <Text style={styles.userName}>{user?.name || 'Kullanıcı'}</Text>
           </View>
-          <Animated.View 
-            entering={FadeInRight.delay(200).springify()}
-            style={styles.logoContainer}
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => router.push('/(tabs)/profile')}
           >
-            <Ionicons name="medical" size={32} color="#1E88E5" />
-          </Animated.View>
+            <Ionicons name="person-circle" size={44} color="#1E88E5" />
+          </TouchableOpacity>
         </Animated.View>
 
-        {/* Stats Card */}
-        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.statsCard}>
-          <View style={styles.statsGradient}>
-            <View style={styles.statsContent}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{recentDocs.length}</Text>
-                <Text style={styles.statLabel}>Toplam Belge</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Ionicons name="shield-checkmark" size={28} color="#fff" />
-                <Text style={styles.statLabel}>Güvenli</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Ionicons name="cloud-done" size={28} color="#fff" />
-                <Text style={styles.statLabel}>Yedekli</Text>
-              </View>
-            </View>
-          </View>
-        </Animated.View>
+        {/* Subtitle */}
+        <Animated.Text 
+          entering={FadeInDown.delay(50).springify()} 
+          style={styles.subtitle}
+        >
+          Sağlığını güvenle takip et
+        </Animated.Text>
+
+        {/* Info Cards - SwiftUI Style */}
+        <View style={styles.cardsContainer}>
+          <InfoCard 
+            title="Günlük Durum" 
+            value="İyi" 
+            index={0}
+          />
+          <InfoCard 
+            title="Son Kayıt" 
+            value={getLastRecordDate()} 
+            index={1}
+          />
+          <InfoCard 
+            title="Toplam Belge" 
+            value={`${recentDocs.length} Adet`} 
+            index={2}
+          />
+        </View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
@@ -215,32 +228,26 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Recent Documents */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Son Belgeler</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/documents')}>
-              <Text style={styles.seeAll}>Tümünü Gör</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Premium CTA - SwiftUI Style */}
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.premiumSection}>
+          <PrimaryButton
+            title="Premium özellikleri keşfet"
+            onPress={() => router.push('/premium')}
+            icon="diamond"
+          />
+        </Animated.View>
 
-          {recentDocs.length === 0 ? (
-            <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="document-text-outline" size={48} color="#90CAF9" />
-              </View>
-              <Text style={styles.emptyTitle}>Henüz belge yok</Text>
-              <Text style={styles.emptyText}>Sağlık belgelerinizi yükleyerek başlayın</Text>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={() => router.push('/(tabs)/upload')}
-              >
-                <Ionicons name="add" size={20} color="#fff" />
-                <Text style={styles.uploadButtonText}>İlk Belgenizi Yükleyin</Text>
+        {/* Recent Documents */}
+        {recentDocs.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Son Belgeler</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/documents')}>
+                <Text style={styles.seeAll}>Tümünü Gör</Text>
               </TouchableOpacity>
-            </Animated.View>
-          ) : (
-            recentDocs.map((doc, index) => (
+            </View>
+
+            {recentDocs.map((doc, index) => (
               <AnimatedTouchable
                 key={doc.id}
                 entering={SlideInRight.delay(100 * index).springify()}
@@ -260,22 +267,15 @@ export default function HomeScreen() {
                   <Ionicons name="chevron-forward" size={20} color="#B0BEC5" />
                 </View>
               </AnimatedTouchable>
-            ))
-          )}
-        </View>
-
-        {/* Health Tips */}
-        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.section}>
-          <Text style={styles.sectionTitle}>Sağlık İpucu</Text>
-          <View style={styles.tipCard}>
-            <View style={styles.tipIconContainer}>
-              <Ionicons name="bulb" size={24} color="#FFC107" />
-            </View>
-            <Text style={styles.tipText}>
-              Düzenli sağlık kontrolü yaptırmak, hastalıkların erken teşhisi için önemlidir.
-              Yılda en az bir kez check-up yaptırmayı unutmayın.
-            </Text>
+            ))}
           </View>
+        )}
+
+        {/* Health Disclaimer - SwiftUI Style */}
+        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.disclaimerContainer}>
+          <Text style={styles.disclaimer}>
+            Bu uygulama tıbbi tavsiye vermez ve doktor yerine geçmez.
+          </Text>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
@@ -295,69 +295,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 6,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   greeting: {
-    fontSize: 16,
-    color: '#78909C',
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#37474F',
   },
   userName: {
     fontSize: 28,
     fontWeight: '800',
     color: '#1A237E',
     letterSpacing: -0.5,
+    marginTop: 2,
   },
-  logoContainer: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 16,
+  profileButton: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1E88E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  statsCard: {
-    borderRadius: 20,
+  subtitle: {
+    fontSize: 15,
+    color: '#78909C',
+    marginBottom: 24,
+  },
+  cardsContainer: {
+    gap: 12,
     marginBottom: 28,
-    overflow: 'hidden',
-    shadowColor: '#1E88E5',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  statsGradient: {
-    backgroundColor: '#1E88E5',
-    padding: 24,
-  },
-  statsContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  statLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   section: {
     marginBottom: 28,
@@ -373,6 +341,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A237E',
     letterSpacing: -0.3,
+    marginBottom: 16,
   },
   seeAll: {
     fontSize: 14,
@@ -410,68 +379,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    shadowColor: '#1E88E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#37474F',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#78909C',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E88E5',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#1E88E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    marginLeft: 8,
+  premiumSection: {
+    marginBottom: 28,
   },
   docCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#1E88E5',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 2,
   },
   docIcon: {
@@ -503,28 +424,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tipCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFDE7',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#FFF9C4',
+  disclaimerContainer: {
+    paddingTop: 8,
   },
-  tipIconContainer: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#FFF59D',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#5D4037',
-    lineHeight: 22,
+  disclaimer: {
+    fontSize: 12,
+    color: '#90A4AE',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
