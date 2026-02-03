@@ -12,6 +12,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  FadeInDown,
+  FadeInLeft,
+  FadeInRight,
+  FadeIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/services/api';
 
@@ -22,6 +34,37 @@ interface Message {
   timestamp: Date;
 }
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+const TypingIndicator = () => {
+  const dot1 = useSharedValue(0);
+  const dot2 = useSharedValue(0);
+  const dot3 = useSharedValue(0);
+
+  useEffect(() => {
+    dot1.value = withRepeat(withSequence(withTiming(-5, { duration: 300 }), withTiming(0, { duration: 300 })), -1);
+    dot2.value = withRepeat(withSequence(withTiming(0, { duration: 150 }), withTiming(-5, { duration: 300 }), withTiming(0, { duration: 300 })), -1);
+    dot3.value = withRepeat(withSequence(withTiming(0, { duration: 300 }), withTiming(-5, { duration: 300 }), withTiming(0, { duration: 300 })), -1);
+  }, []);
+
+  const style1 = useAnimatedStyle(() => ({ transform: [{ translateY: dot1.value }] }));
+  const style2 = useAnimatedStyle(() => ({ transform: [{ translateY: dot2.value }] }));
+  const style3 = useAnimatedStyle(() => ({ transform: [{ translateY: dot3.value }] }));
+
+  return (
+    <View style={styles.typingContainer}>
+      <View style={styles.typingAvatar}>
+        <Ionicons name="medical" size={16} color="#1E88E5" />
+      </View>
+      <View style={styles.typingBubble}>
+        <Animated.View style={[styles.typingDot, style1]} />
+        <Animated.View style={[styles.typingDot, style2]} />
+        <Animated.View style={[styles.typingDot, style3]} />
+      </View>
+    </View>
+  );
+};
+
 export default function AssistantScreen() {
   const { token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -30,13 +73,14 @@ export default function AssistantScreen() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
+  const sendButtonScale = useSharedValue(1);
+
   const loadChatHistory = useCallback(async () => {
     if (!token) return;
     try {
       const response = await api.get(`/chat/history?token=${token}`);
       const history: Message[] = [];
       
-      // Reverse to show oldest first
       response.data.reverse().forEach((chat: any) => {
         history.push({
           id: `${chat.id}_user`,
@@ -65,11 +109,10 @@ export default function AssistantScreen() {
   }, [loadChatHistory]);
 
   useEffect(() => {
-    // Add welcome message if no history
     if (!isLoadingHistory && messages.length === 0) {
       setMessages([{
         id: 'welcome',
-        text: 'Merhaba! Ben VitaMed sağlık asistanınızım. Size genel sağlık bilgileri konusunda yardımcı olabilirim. Lütfen sorularınızı sorun.\n\nÖnemli: Ben tanı koyamam veya tedavi öneremem. Her zaman bir sağlık uzmanına danışmanızı öneririm.',
+        text: 'Merhaba! 👋 Ben VitaMed sağlık asistanınızım.\n\nSize genel sağlık bilgileri konusunda yardımcı olabilirim. Sorularınızı sorabilirsiniz.\n\n⚠️ Önemli: Tanı koyamam veya tedavi öneremem. Her zaman bir sağlık uzmanına danışmanızı öneririm.',
         isUser: false,
         timestamp: new Date(),
       }]);
@@ -106,7 +149,7 @@ export default function AssistantScreen() {
     } catch (error: any) {
       const errorMessage: Message = {
         id: `error_${Date.now()}`,
-        text: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.',
+        text: '😔 Üzgünüm, şu an yanıt veremiyorum. Lütfen daha sonra tekrar deneyin.',
         isUser: false,
         timestamp: new Date(),
       };
@@ -116,8 +159,13 @@ export default function AssistantScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View
+  const sendButtonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendButtonScale.value }],
+  }));
+
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => (
+    <Animated.View
+      entering={item.isUser ? FadeInRight.delay(50).springify() : FadeInLeft.delay(50).springify()}
       style={[
         styles.messageContainer,
         item.isUser ? styles.userMessageContainer : styles.assistantMessageContainer,
@@ -125,7 +173,7 @@ export default function AssistantScreen() {
     >
       {!item.isUser && (
         <View style={styles.avatarContainer}>
-          <Ionicons name="medical" size={20} color="#1E88E5" />
+          <Ionicons name="medical" size={18} color="#1E88E5" />
         </View>
       )}
       <View
@@ -138,13 +186,13 @@ export default function AssistantScreen() {
           {item.text}
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 
   const suggestedQuestions = [
-    'Kan tahlili sonuçlarım ne anlama geliyor?',
-    'Sağlıklı beslenme önerileri',
-    'Uyku düzeni nasıl iyileştirilir?',
+    { icon: 'water', text: 'Kan tahlili sonuçlarım ne anlama geliyor?' },
+    { icon: 'nutrition', text: 'Sağlıklı beslenme önerileri' },
+    { icon: 'moon', text: 'Uyku düzeni nasıl iyileştirilir?' },
   ];
 
   return (
@@ -155,20 +203,24 @@ export default function AssistantScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="medical" size={24} color="#1E88E5" />
+        <Animated.View entering={FadeInDown.springify()} style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerIcon}>
+              <Ionicons name="medical" size={24} color="#1E88E5" />
+              <View style={styles.onlineDot} />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>Sağlık Asistanı</Text>
+              <Text style={styles.headerSubtitle}>AI Destekli • Her zaman yanınızda</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.headerTitle}>Sağlık Asistanı</Text>
-            <Text style={styles.headerSubtitle}>Her zaman yanınızda</Text>
-          </View>
-        </View>
+        </Animated.View>
 
         {/* Messages */}
         {isLoadingHistory ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#1E88E5" />
+            <Text style={styles.loadingText}>Mesajlar yükleniyor...</Text>
           </View>
         ) : (
           <FlatList
@@ -178,53 +230,60 @@ export default function AssistantScreen() {
             renderItem={renderMessage}
             contentContainerStyle={styles.messagesContent}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-            ListFooterComponent={
-              isLoading ? (
-                <View style={styles.loadingMessage}>
-                  <ActivityIndicator size="small" color="#1E88E5" />
-                  <Text style={styles.loadingText}>Yanıt hazırlanıyor...</Text>
-                </View>
-              ) : null
-            }
+            showsVerticalScrollIndicator={false}
+            ListFooterComponent={isLoading ? <TypingIndicator /> : null}
           />
         )}
 
         {/* Suggested Questions */}
         {messages.length <= 1 && !isLoadingHistory && (
-          <View style={styles.suggestionsContainer}>
+          <Animated.View entering={FadeIn.delay(300)} style={styles.suggestionsContainer}>
             <Text style={styles.suggestionsTitle}>Önerilen Sorular</Text>
             {suggestedQuestions.map((question, index) => (
-              <TouchableOpacity
+              <AnimatedTouchable
                 key={index}
+                entering={FadeInDown.delay(100 * index).springify()}
                 style={styles.suggestionButton}
-                onPress={() => setInputText(question)}
+                onPress={() => setInputText(question.text)}
               >
-                <Text style={styles.suggestionText}>{question}</Text>
-                <Ionicons name="arrow-forward" size={16} color="#1E88E5" />
-              </TouchableOpacity>
+                <View style={styles.suggestionIcon}>
+                  <Ionicons name={question.icon as any} size={18} color="#1E88E5" />
+                </View>
+                <Text style={styles.suggestionText}>{question.text}</Text>
+                <Ionicons name="arrow-forward" size={16} color="#B0BEC5" />
+              </AnimatedTouchable>
             ))}
-          </View>
+          </Animated.View>
         )}
 
         {/* Input */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Sorunuzu yazın..."
-            placeholderTextColor="#999"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!inputText.trim() || isLoading) && styles.sendButtonDisabled]}
+        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Sorunuzu yazın..."
+              placeholderTextColor="#90A4AE"
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+            />
+          </View>
+          <AnimatedTouchable
+            style={[
+              styles.sendButton,
+              sendButtonStyle,
+              (!inputText.trim() || isLoading) && styles.sendButtonDisabled,
+            ]}
             onPress={sendMessage}
+            onPressIn={() => { sendButtonScale.value = withSpring(0.9); }}
+            onPressOut={() => { sendButtonScale.value = withSpring(1); }}
             disabled={!inputText.trim() || isLoading}
+            activeOpacity={1}
           >
             <Ionicons name="send" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
+          </AnimatedTouchable>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -233,49 +292,75 @@ export default function AssistantScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: '#F5F9FF',
   },
   keyboardView: {
     flex: 1,
   },
   header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8EEF4',
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
   },
   headerIcon: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     backgroundColor: '#E3F2FD',
-    borderRadius: 22,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
+    position: 'relative',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    backgroundColor: '#4CAF50',
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1A237E',
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: '#78909C',
+    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#78909C',
+  },
   messagesContent: {
     padding: 16,
+    paddingBottom: 8,
   },
   messageContainer: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   userMessageContainer: {
     justifyContent: 'flex-end',
@@ -284,46 +369,80 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     backgroundColor: '#E3F2FD',
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
     alignSelf: 'flex-end',
   },
   messageBubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
+    maxWidth: '78%',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 20,
   },
   userBubble: {
     backgroundColor: '#1E88E5',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   assistantBubble: {
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   messageText: {
     fontSize: 15,
-    color: '#333',
+    color: '#37474F',
     lineHeight: 22,
   },
   userMessageText: {
     color: '#fff',
   },
-  loadingMessage: {
+  typingContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 40,
+    alignItems: 'flex-end',
+    marginBottom: 16,
   },
-  loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#999',
+  typingAvatar: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    backgroundColor: '#90CAF9',
+    borderRadius: 4,
   },
   suggestionsContainer: {
     paddingHorizontal: 16,
@@ -331,55 +450,79 @@ const styles = StyleSheet.create({
   },
   suggestionsTitle: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: '#78909C',
+    marginBottom: 12,
+    marginLeft: 4,
   },
   suggestionButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  suggestionIcon: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   suggestionText: {
-    fontSize: 14,
-    color: '#333',
     flex: 1,
+    fontSize: 14,
+    color: '#37474F',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingBottom: 20,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: '#E8EEF4',
+  },
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: '#F5F9FF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E8EEF4',
+    marginRight: 12,
   },
   input: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    paddingRight: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#333',
+    color: '#263238',
     maxHeight: 100,
   },
   sendButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     backgroundColor: '#1E88E5',
-    borderRadius: 22,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    shadowColor: '#1E88E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    backgroundColor: '#90CAF9',
+    backgroundColor: '#B0BEC5',
+    shadowOpacity: 0.1,
   },
 });
