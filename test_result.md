@@ -366,14 +366,14 @@ metadata:
 
 test_plan:
   current_focus:
-    - "User Login API"
-    - "Create Document API"
-    - "Get Documents API"
-    - "Delete Document API"
-  stuck_tasks: []
+    - "Chat with Assistant API"
+  stuck_tasks:
+    - "Chat with Assistant API"
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
     message: "VitaMed uygulaması MVP oluşturuldu. Backend API'leri curl ile test edildi - auth, chat çalışıyor. Document CRUD ve diğer endpoint'ler test edilmeli."
+  - agent: "testing"
+    message: "Backend API testing completed. 11/12 tests passed. All auth and document CRUD APIs working correctly. Chat API failing due to LLM budget exceeded (cost: 0.0012575, max: 0.001). Need to increase budget or use different LLM provider."
