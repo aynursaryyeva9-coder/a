@@ -233,27 +233,33 @@ backend:
 
   - task: "Chat with Assistant API"
     implemented: true
-    working: true
+    working: false
     file: "/app/backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Tested with curl - GPT-4o responds in Turkish correctly"
+      - working: false
+        agent: "testing"
+        comment: "❌ FAIL - Chat API failing due to LLM budget exceeded. Error: Budget has been exceeded! Current cost: 0.0012575, Max budget: 0.001. Status: 500"
 
   - task: "Get Chat History API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Needs testing"
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Get chat history API working correctly. Returns empty list when no chats exist. Status: 200"
 
 frontend:
   - task: "Login Screen"
